@@ -1,0 +1,40 @@
+from playwright.sync_api import sync_playwright
+import csv
+
+urls = {
+    "MainStage": "https://comedybar.ca/events/1",
+    "Cabaret": "https://comedybar.ca/events/2",
+    "Danforth": "https://comedybar.ca/events/11"
+}
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
+    all_events = []
+
+    for venue, url in urls.items():
+        print(f"Scraping {venue} calendar: {url}")
+        page.goto(url, timeout=60000)
+        page.wait_for_selector(".fc-event-container", timeout=15000)
+
+        # Get all event links
+        event_elements = page.locator(".fc-event-container a.link-btn")
+        count = event_elements.count()
+
+        for i in range(count):
+            el = event_elements.nth(i)
+            href = el.get_attribute("href")
+            if href:
+                full_url = "https://comedybar.ca" + href
+                all_events.append({
+                    "venue": venue,
+                    "link": full_url
+                })
+
+    # Save to CSV
+    with open("events_calendar.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["venue", "link"])
+        writer.writeheader()
+        writer.writerows(all_events)
+
+    print(f"Saved {len(all_events)} events to events_calendar.csv")

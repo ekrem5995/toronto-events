@@ -1,0 +1,51 @@
+from playwright.sync_api import sync_playwright
+import pandas as pd
+import os
+
+def scrape_blogto_events():
+    os.makedirs("output", exist_ok=True)
+    base_url = "https://www.blogto.com/events/"
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)  # Use False for now to watch
+        context = browser.new_context()
+        page = context.new_page()
+        page.goto(base_url)
+        page.wait_for_selector(".event-info-box-grid-item", timeout=10000)
+
+        cards = page.query_selector_all(".event-info-box-grid-item")
+        print(f"Found {len(cards)} events.")
+
+        events = []
+        for card in cards:
+            try:
+                title_el = card.query_selector("a.event-info-box-title-link")
+                title = title_el.inner_text().strip()
+                link = title_el.get_attribute("href")
+
+                time_el = card.query_selector("div.event-info-box-date")
+                time = time_el.inner_text().strip() if time_el else "N/A"
+
+                venue_el = card.query_selector("div.event-info-box-venue")
+                venue = venue_el.inner_text().strip() if venue_el else "N/A"
+
+                events.append({
+                    "title": title,
+                    "url": link,
+                    "date_time": time,
+                    "venue": venue
+                })
+
+            except Exception as e:
+                print("Skipped one card:", e)
+                continue
+
+        browser.close()
+
+    df = pd.DataFrame(events)
+    df.to_csv("output/blogto_events.csv", index=False)
+    print(f"Saved {len(df)} events to output/blogto_events.csv.")
+
+if __name__ == "__main__":
+    scrape_blogto_events()
+
